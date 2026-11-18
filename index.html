@@ -708,15 +708,21 @@ const histOverlay = document.getElementById("hist-overlay");
 const histTitle   = document.getElementById("hist-title");
 const histList    = document.getElementById("hist-list");
 document.getElementById("hist-close").addEventListener("click", closeHistModal);
-function closeHistModal() { histOverlay.classList.remove("open"); }
+let histQuery = null;
+function closeHistModal() {
+  histOverlay.classList.remove("open");
+  if (histQuery) { histQuery.off(); histQuery = null; }
+}
 
 function openHistory(env) {
   closeAllDropdowns();
   if (!db) return;
+  if (histQuery) histQuery.off();
   histTitle.textContent = "Historik: " + env;
   histList.innerHTML = '<div class="hist-loading">Laddar…</div>';
   histOverlay.classList.add("open");
-  db.ref("history/" + env).orderByChild("at").limitToLast(25).once("value", snap => {
+  histQuery = db.ref("history/" + env).orderByChild("at").limitToLast(25);
+  histQuery.on("value", snap => {
     const entries = [];
     snap.forEach(child => { entries.push(child.val()); });
     entries.sort((a, b) => ((b && b.at) || "").localeCompare((a && a.at) || ""));
@@ -930,6 +936,7 @@ function renderLog() {
   document.getElementById("activity-count").textContent =
     filtered ? `${valid.length} av ${logEntries.length}` : `${logEntries.length} ändringar`;
   document.getElementById("f-reset").style.visibility = filtered ? "visible" : "hidden";
+  const scroll = list.scrollTop;
   list.innerHTML = "";
   if (!valid.length) {
     list.innerHTML = '<div class="log-empty">Inga ändringar matchar filtret.</div>';
@@ -961,6 +968,7 @@ function renderLog() {
         </div>`;
       group.appendChild(row);
   });
+  list.scrollTop = scroll;
 }
 
 // ── Boot ────────────────────────────────────────────────────────────
@@ -997,6 +1005,7 @@ function renderLog() {
   });
 
   setupActivityFeed();
+  setInterval(renderLog, 60e3);
 })();
 </script>
 </body>
