@@ -268,6 +268,58 @@ body {
 }
 .dropdown-item:hover { background: var(--bg); }
 
+/* ── Changelog filters ── */
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.log-filters select, .log-filters input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+}
+.log-filters select:focus, .log-filters input:focus { border-color: var(--accent); }
+.log-filters input { flex: 1; min-width: 180px; }
+.f-chips {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 2px;
+}
+.f-chip {
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.f-chip:hover  { color: var(--text); }
+.f-chip.active { background: var(--accent); color: #fff; }
+.f-reset {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  visibility: hidden;
+}
+.log-empty { font-size: 13px; color: var(--muted); padding: 24px 0; text-align: center; }
+
 /* ── Changelog ── */
 #activity-list {
   background: var(--surface);
@@ -473,6 +525,19 @@ body {
   <div class="section-header">
     <span class="section-title">Ändringslogg</span>
     <span class="section-badge" id="activity-count"></span>
+  </div>
+  <div class="log-filters">
+    <select id="f-env" aria-label="Filtrera på miljö">
+      <option value="">Alla miljöer</option>
+    </select>
+    <div class="f-chips">
+      <button class="f-chip active" data-status="">Alla</button>
+      <button class="f-chip" data-status="block">Blockerad</button>
+      <button class="f-chip" data-status="unclear">Oklart</button>
+      <button class="f-chip" data-status="clear">Rensad</button>
+    </div>
+    <input type="search" id="f-search" placeholder="Sök namn eller anledning…" aria-label="Sök">
+    <button class="f-reset" id="f-reset">Rensa filter</button>
   </div>
   <div id="activity-list"></div>
 </div>
@@ -773,22 +838,60 @@ function renderEnvGrid() {
 }
 
 // ── Activity feed ────────────────────────────────────────────────────
+let logEntries = [];
+const logFilter = { env: "", status: "", q: "" };
+
+const fEnv    = document.getElementById("f-env");
+const fSearch = document.getElementById("f-search");
+ENVS.forEach(env => fEnv.insertAdjacentHTML("beforeend", `<option value="${env}">${env}</option>`));
+fEnv.addEventListener("change", () => { logFilter.env = fEnv.value; renderLog(); });
+fSearch.addEventListener("input", () => { logFilter.q = fSearch.value.trim().toLowerCase(); renderLog(); });
+document.querySelectorAll(".f-chip").forEach(chip => chip.addEventListener("click", () => {
+  logFilter.status = chip.dataset.status;
+  document.querySelectorAll(".f-chip").forEach(c => c.classList.toggle("active", c === chip));
+  renderLog();
+}));
+document.getElementById("f-reset").addEventListener("click", () => {
+  logFilter.env = logFilter.status = logFilter.q = "";
+  fEnv.value = ""; fSearch.value = "";
+  document.querySelectorAll(".f-chip").forEach(c => c.classList.toggle("active", c.dataset.status === ""));
+  renderLog();
+});
+
 function setupActivityFeed() {
   if (!db) return;
-  db.ref("activity").orderByChild("at").limitToLast(50).on("value", snap => {
+  db.ref("activity").orderByChild("at").limitToLast(300).on("value", snap => {
     const entries = [];
     snap.forEach(child => { entries.push(child.val()); });
-    const valid = entries
+    logEntries = entries
       .filter(e => e && e.status && e.env && e.at)
       .sort((a, b) => b.at.localeCompare(a.at));
-    const section = document.getElementById("activity-section");
-    const list    = document.getElementById("activity-list");
-    document.getElementById("activity-count").textContent = valid.length + " ändringar";
-    if (!valid.length) { section.style.display = "none"; return; }
-    section.style.display = "";
-    list.innerHTML = "";
-    let currentDay = null, group = null;
-    valid.forEach(e => {
+    renderLog();
+  });
+}
+
+function renderLog() {
+  const section = document.getElementById("activity-section");
+  const list    = document.getElementById("activity-list");
+  if (!logEntries.length) { section.style.display = "none"; return; }
+  section.style.display = "";
+  const { env, status, q } = logFilter;
+  const valid = logEntries.filter(e =>
+    (!env || e.env === env) &&
+    (!status || e.status === status) &&
+    (!q || [e.name, e.reason, e.env].some(v => v && v.toLowerCase().includes(q)))
+  );
+  const filtered = env || status || q;
+  document.getElementById("activity-count").textContent =
+    filtered ? `${valid.length} av ${logEntries.length}` : `${logEntries.length} ändringar`;
+  document.getElementById("f-reset").style.visibility = filtered ? "visible" : "hidden";
+  list.innerHTML = "";
+  if (!valid.length) {
+    list.innerHTML = '<div class="log-empty">Inga ändringar matchar filtret.</div>';
+    return;
+  }
+  let currentDay = null, group = null;
+  valid.forEach(e => {
       const day = dayLabel(e.at);
       if (day !== currentDay) {
         currentDay = day;
@@ -812,7 +915,6 @@ function setupActivityFeed() {
           <div class="log-meta">${e.name ? esc(e.name) : "Okänd"}${e.until ? " · till " + fmt(e.until) : ""}</div>
         </div>`;
       group.appendChild(row);
-    });
   });
 }
 
