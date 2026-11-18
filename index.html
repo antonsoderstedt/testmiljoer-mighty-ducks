@@ -593,7 +593,7 @@ function openHistory(env) {
   histTitle.textContent = "Historik: " + env;
   histList.innerHTML = '<div class="hist-loading">Laddar…</div>';
   histOverlay.classList.add("open");
-  db.ref("history/" + env).orderByChild("at").limitToLast(25).once("value", snap => {
+  db.ref("history/" + env).limitToLast(25).once("value", snap => {
     const entries = [];
     snap.forEach(child => entries.push(child.val()));
     entries.reverse();
@@ -640,8 +640,8 @@ function setStatus(env, status, reason, until, name) {
   const at = new Date().toISOString();
   db.ref("status/" + env).set({ status, reason: reason || null, until: until || null });
   const entry = { env, status, reason: reason || null, until: until || null, at, name: name || null };
-  db.ref("history/" + env + "/" + Date.now()).set(entry);
-  db.ref("activity/" + Date.now()).set(entry);
+  db.ref("history/" + env).push(entry);
+  db.ref("activity").push(entry);
 }
 
 // ── Render ─────────────────────────────────────────────────────────────
@@ -732,7 +732,7 @@ function renderEnvGrid() {
 // ── Activity feed ────────────────────────────────────────────────────
 function setupActivityFeed() {
   if (!db) return;
-  db.ref("activity").orderByChild("at").limitToLast(8).on("value", snap => {
+  db.ref("activity").limitToLast(8).on("value", snap => {
     const entries = [];
     snap.forEach(child => entries.push(child.val()));
     entries.reverse();
