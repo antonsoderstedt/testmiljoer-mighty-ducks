@@ -1,0 +1,49 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": false,
+
+    "status": {
+      "$env": {
+        ".write": "$env.matches(/^(CT[1-5]|U[345]|Stable)$/) && newData.exists()",
+        ".validate": "newData.hasChild('status')",
+        "status": { ".validate": "newData.isString() && newData.val().matches(/^(block|unclear|clear)$/)" },
+        "reason": { ".validate": "newData.isString() && newData.val().length <= 500" },
+        "until":  { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "history": {
+      "$env": {
+        ".indexOn": ["at"],
+        "$id": {
+          ".write": "$env.matches(/^(CT[1-5]|U[345]|Stable)$/) && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['env', 'status', 'at', 'name']) && newData.child('env').val() === $env",
+          "env":    { ".validate": "newData.isString()" },
+          "status": { ".validate": "newData.isString() && newData.val().matches(/^(block|unclear|clear)$/)" },
+          "reason": { ".validate": "newData.isString() && newData.val().length <= 500" },
+          "until":  { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "at":     { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "name":   { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "activity": {
+      ".indexOn": ["at"],
+      "$id": {
+        ".write": "!data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['env', 'status', 'at', 'name'])",
+        "env":    { ".validate": "newData.isString() && newData.val().matches(/^(CT[1-5]|U[345]|Stable)$/)" },
+        "status": { ".validate": "newData.isString() && newData.val().matches(/^(block|unclear|clear)$/)" },
+        "reason": { ".validate": "newData.isString() && newData.val().length <= 500" },
+        "until":  { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "at":     { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "name":   { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100" },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
