@@ -268,24 +268,58 @@ body {
 }
 .dropdown-item:hover { background: var(--bg); }
 
-/* ── Activity feed ── */
-.activity-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 0;
+/* ── Changelog ── */
+#activity-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px 18px 10px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+.log-day {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 14px 0 6px;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
 }
-.activity-item:last-child { border-bottom: none; }
-.activity-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+.log-day::first-letter { text-transform: uppercase; }
+.log-row {
+  display: grid;
+  grid-template-columns: 46px 56px 84px 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 13px;
 }
-.activity-dot.green  { background: var(--green); }
-.activity-dot.red    { background: var(--red); }
-.activity-dot.yellow { background: #d97706; }
-.activity-body { flex: 1; }
-.activity-title { font-size: 13px; color: var(--text); line-height: 1.4; }
-.activity-meta  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.log-group .log-row:last-child { border-bottom: none; }
+.log-time { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--muted); }
+.log-env  { font-weight: 700; }
+.log-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-align: center;
+  justify-self: start;
+}
+.log-status.block   { background: var(--red-b);    color: var(--red); }
+.log-status.unclear { background: var(--yellow-b); color: var(--yellow); }
+.log-status.clear   { background: var(--green-b);  color: var(--green); }
+.log-reason { color: var(--text); line-height: 1.4; word-break: break-word; }
+.log-meta   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+@media (max-width: 600px) {
+  .log-row { grid-template-columns: 42px 1fr auto; }
+  .log-body { grid-column: 1 / -1; padding-left: 52px; }
+}
 
 /* ── Modal overlay ── */
 .overlay {
@@ -437,7 +471,8 @@ body {
 
 <div class="section" id="activity-section" style="display:none">
   <div class="section-header">
-    <span class="section-title">Senaste aktivitet</span>
+    <span class="section-title">Ändringslogg</span>
+    <span class="section-badge" id="activity-count"></span>
   </div>
   <div id="activity-list"></div>
 </div>
@@ -515,6 +550,16 @@ function fmt(iso) {
   try { return new Date(iso).toLocaleString("sv-SE",{dateStyle:"short",timeStyle:"short"}); }
   catch { return iso; }
 }
+function timeOnly(iso) {
+  return new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+}
+function dayLabel(iso) {
+  const d = new Date(iso), today = new Date(), yest = new Date();
+  yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Idag";
+  if (d.toDateString() === yest.toDateString())  return "Igår";
+  return d.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
+}
 function esc(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
@@ -591,10 +636,10 @@ function openHistory(env) {
   histTitle.textContent = "Historik: " + env;
   histList.innerHTML = '<div class="hist-loading">Laddar…</div>';
   histOverlay.classList.add("open");
-  db.ref("history/" + env).limitToLast(25).once("value", snap => {
+  db.ref("history/" + env).orderByChild("at").limitToLast(25).once("value", snap => {
     const entries = [];
-    snap.forEach(child => entries.push(child.val()));
-    entries.reverse();
+    snap.forEach(child => { entries.push(child.val()); });
+    entries.sort((a, b) => ((b && b.at) || "").localeCompare((a && a.at) || ""));
     if (!entries.length) {
       histList.innerHTML = '<div class="hist-empty">Ingen historik ännu.</div>';
       return;
@@ -730,30 +775,43 @@ function renderEnvGrid() {
 // ── Activity feed ────────────────────────────────────────────────────
 function setupActivityFeed() {
   if (!db) return;
-  db.ref("activity").limitToLast(8).on("value", snap => {
+  db.ref("activity").orderByChild("at").limitToLast(50).on("value", snap => {
     const entries = [];
-    snap.forEach(child => entries.push(child.val()));
-    entries.reverse();
+    snap.forEach(child => { entries.push(child.val()); });
+    const valid = entries
+      .filter(e => e && e.status && e.env && e.at)
+      .sort((a, b) => b.at.localeCompare(a.at));
     const section = document.getElementById("activity-section");
     const list    = document.getElementById("activity-list");
-    if (!entries.length) { section.style.display = "none"; return; }
+    document.getElementById("activity-count").textContent = valid.length + " ändringar";
+    if (!valid.length) { section.style.display = "none"; return; }
     section.style.display = "";
     list.innerHTML = "";
-    entries.forEach(e => {
-      if (!e || !e.status || !e.env) return;
+    let currentDay = null, group = null;
+    valid.forEach(e => {
+      const day = dayLabel(e.at);
+      if (day !== currentDay) {
+        currentDay = day;
+        const h = document.createElement("div");
+        h.className = "log-day";
+        h.textContent = day;
+        list.appendChild(h);
+        group = document.createElement("div");
+        group.className = "log-group";
+        list.appendChild(group);
+      }
       const info = STATUS_MAP[e.status] || STATUS_MAP.clear;
-      const item = document.createElement("div");
-      item.className = "activity-item";
-      const title = e.status === "clear"
-        ? `${e.env} markerades klar`
-        : `${e.env} ${e.status === "block" ? "blockerades" : "markerades oklart"}`;
-      item.innerHTML = `
-        <span class="activity-dot ${info.dot}"></span>
-        <div class="activity-body">
-          <div class="activity-title">${title}${e.reason ? ": " + esc(e.reason) : ""}</div>
-          <div class="activity-meta">${e.at ? fmt(e.at) : ""}${e.name ? " · " + esc(e.name) : ""}</div>
+      const row = document.createElement("div");
+      row.className = "log-row";
+      row.innerHTML = `
+        <span class="log-time">${timeOnly(e.at)}</span>
+        <span class="log-env">${esc(e.env)}</span>
+        <span class="log-status ${e.status}">${info.label}</span>
+        <div class="log-body">
+          ${e.reason ? `<div class="log-reason">${esc(e.reason)}</div>` : ""}
+          <div class="log-meta">${e.name ? esc(e.name) : "Okänd"}${e.until ? " · till " + fmt(e.until) : ""}</div>
         </div>`;
-      list.appendChild(item);
+      group.appendChild(row);
     });
   });
 }
