@@ -564,7 +564,6 @@ function openModal(env, status) {
 }
 function closeModal() { overlay.classList.remove("open"); pendingEnv = pendingStatus = null; }
 document.getElementById("modal-cancel").addEventListener("click", closeModal);
-overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
 
 confirmBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
@@ -584,7 +583,6 @@ const histOverlay = document.getElementById("hist-overlay");
 const histTitle   = document.getElementById("hist-title");
 const histList    = document.getElementById("hist-list");
 document.getElementById("hist-close").addEventListener("click", closeHistModal);
-histOverlay.addEventListener("click", e => { if (e.target === histOverlay) closeHistModal(); });
 function closeHistModal() { histOverlay.classList.remove("open"); }
 
 function openHistory(env) {
