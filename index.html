@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kan vi deploya?</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f5f0e3;
+  --surface:   #fffdf8;
+  --border:    #ddd5c5;
+  --text:      #1c1917;
+  --muted:     #78716c;
+  --green:     #15803d;
+  --green-bg:  #f0fdf4;
+  --green-b:   #bbf7d0;
+  --red:       #b91c1c;
+  --red-bg:    #fff1f2;
+  --red-b:     #fecdd3;
+  --yellow:    #92400e;
+  --yellow-bg: #fffbeb;
+  --yellow-b:  #fde68a;
+  --accent:    #3b6b4e;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 28px 24px 48px;
+}
+
+/* ── Setup banner ── */
+.setup-banner {
+  background: #fff8e1;
+  border: 1.5px solid #f9a825;
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 24px;
+  display: none;
+}
+.setup-banner.show { display: block; }
+.setup-banner h3 { font-size: 15px; font-weight: 700; color: #5d4037; margin-bottom: 8px; }
+.setup-banner p  { font-size: 13px; color: #6d4c41; line-height: 1.5; margin-bottom: 6px; }
+.setup-banner code { background: rgba(0,0,0,0.07); padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 12px; }
+.setup-banner a  { color: var(--accent); font-weight: 600; }
+
+/* ── Error notice ── */
+.notice {
+  background: var(--red-bg);
+  border: 1px solid var(--red-b);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--red);
+  margin-bottom: 20px;
+  display: none;
+}
+.notice.show { display: block; }
+
+/* ── Page header ── */
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.header-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.page-header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+.header-sub { font-size: 13px; color: var(--muted); }
+.logo {
+  height: 180px;
+  width: auto;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,0.10));
+  display: none;
+}
+
+/* ── Stats row ── */
+.stats-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 22px;
+  min-width: 140px;
+}
+.stat-value { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; margin-bottom: 4px; }
+.stat-value.green { color: var(--green); }
+.stat-value.red   { color: var(--red); }
+.stat-label { font-size: 12px; color: var(--muted); }
+
+/* ── Section ── */
+.section { margin-bottom: 28px; }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.section-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.section-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--border);
+  color: var(--muted);
+  padding: 2px 10px;
+  border-radius: 20px;
+}
+
+/* ── Env grid ── */
+.env-grid { display: flex; flex-direction: column; gap: 8px; }
+.clear-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+/* ── Cards ── */
+.clear-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px 12px;
+}
+.clear-card.block   { background: var(--red-bg);    border-color: var(--red-b); }
+.clear-card.unclear { background: var(--yellow-bg); border-color: var(--yellow-b); }
+
+.clear-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+.dot.green  { background: var(--green); }
+.dot.red    { background: var(--red); }
+.dot.yellow { background: #d97706; }
+.dot.grey   { background: #9ca3af; }
+
+.clear-name { font-size: 13px; font-weight: 700; flex: 1; }
+
+.status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: .02em;
+}
+.status-badge.block   { background: var(--red-b);    color: var(--red); }
+.status-badge.unclear { background: var(--yellow-b); color: var(--yellow); }
+
+.card-reason {
+  font-size: 11px;
+  color: var(--text);
+  margin: 4px 0 4px;
+  word-break: break-word;
+  line-height: 1.4;
+}
+.card-until {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.clear-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.clear-sub2 { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 2px; margin-bottom: 10px; }
+
+.clear-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 6px;
+}
+
+/* ── Buttons ── */
+.btn-clear-env {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-b);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.btn-clear-env:hover { background: #dcfce7; }
+
+.history-link {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Dropdown ── */
+.dropdown-wrap { position: relative; }
+.btn-menu {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  color: var(--muted);
+  padding: 4px 10px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background .12s;
+}
+.btn-menu:hover { background: var(--border); color: var(--text); }
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  overflow: hidden;
+  z-index: 100;
+  display: none;
+  min-width: 140px;
+}
+.dropdown.open { display: block; }
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.dropdown-item:hover { background: var(--bg); }
+
+/* ── Activity feed ── */
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+}
+.activity-dot.green  { background: var(--green); }
+.activity-dot.red    { background: var(--red); }
+.activity-dot.yellow { background: #d97706; }
+.activity-body { flex: 1; }
+.activity-title { font-size: 13px; color: var(--text); line-height: 1.4; }
+.activity-meta  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ── Modal overlay ── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999;
+  opacity: 0; pointer-events: none;
+  transition: opacity .15s;
+}
+.overlay.open { opacity: 1; pointer-events: all; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 28px 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  transform: translateY(10px);
+  transition: transform .15s;
+}
+.overlay.open .modal { transform: translateY(0); }
+
+.modal-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+.field { margin-bottom: 16px; }
+.field label { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; display: block; letter-spacing: .03em; text-transform: uppercase; }
+.field input, .field textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color .12s;
+}
+.field input:focus, .field textarea:focus { border-color: var(--accent); }
+.field textarea { resize: vertical; min-height: 68px; line-height: 1.5; }
+.field-error { font-size: 11px; color: var(--red); margin-top: 5px; display: none; }
+.field-error.show { display: block; }
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.btn-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.btn-cancel:hover { background: var(--border); color: var(--text); }
+
+.btn-confirm-modal {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+}
+.btn-confirm-modal.block   { background: var(--red); }
+.btn-confirm-modal.unclear { background: #d97706; }
+.btn-confirm-modal.clear   { background: var(--green); }
+.btn-confirm-modal:hover { opacity: .88; }
+
+/* ── History modal ── */
+.hist-list { display: flex; flex-direction: column; gap: 0; max-height: 350px; overflow-y: auto; }
+.hist-entry {
+  display: flex;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.hist-entry:last-child { border-bottom: none; }
+.hist-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+}
+.hist-dot.green  { background: var(--green); }
+.hist-dot.red    { background: var(--red); }
+.hist-dot.yellow { background: #d97706; }
+.hist-body { flex: 1; }
+.hist-row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.hist-status { font-size: 13px; font-weight: 600; color: var(--text); }
+.hist-time   { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.hist-reason { font-size: 12px; color: var(--text); line-height: 1.4; margin-top: 2px; }
+.hist-until  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.hist-loading, .hist-empty { font-size: 13px; color: var(--muted); padding: 20px 0; text-align: center; }
+
+@media (max-width: 600px) {
+  body { padding: 16px 14px 36px; }
+  .page-header { flex-direction: column-reverse; align-items: flex-start; }
+  .logo { height: 100px; }
+  .clear-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="setup-banner" id="setup-banner">
+  <h3>Firebase behöver konfigureras</h3>
+  <p>För att datan ska delas i realtid behövs ett Firebase Realtime Database-projekt. Följ stegen nedan och uppdatera sedan <code>FIREBASE_CONFIG</code> längst ner i <code>index.html</code>.</p>
+  <p>1. Gå till <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → Skapa projekt (gratis).</p>
+  <p>2. Bygg → Realtime Database → Skapa databas → Testläge (public read/write).</p>
+  <p>3. Projektinställningar → Dina appar → Webbapp → Registrera → kopiera config-objektet.</p>
+  <p>4. Klistra in värdena i <code>FIREBASE_CONFIG</code> i <code>index.html</code> och pusha.</p>
+</div>
+
+<div class="notice" id="notice"></div>
+
+<div class="page-header">
+  <div>
+    <div class="header-label">Mighty Ducks</div>
+    <h1>Kan vi deploya?</h1>
+    <div class="header-sub" id="last-updated">Laddar status…</div>
+  </div>
+  <img class="logo" id="logo" src="" alt="Mighty Ducks">
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-value green" id="stat-ready">–</div>
+    <div class="stat-label">Redo för deploy</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-blockers">–</div>
+    <div class="stat-label">Aktiva blockers</div>
+  </div>
+</div>
+
+<div class="section" id="blocked-section">
+  <div class="section-header">
+    <span class="section-title">Miljöer</span>
+    <span class="section-badge" id="env-count">–</span>
+  </div>
+  <div class="clear-grid" id="env-grid"></div>
+</div>
+
+<div class="section" id="activity-section" style="display:none">
+  <div class="section-header">
+    <span class="section-title">Senaste aktivitet</span>
+  </div>
+  <div id="activity-list"></div>
+</div>
+
+<!-- Status modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="field">
+      <label>Ditt namn *</label>
+      <input type="text" id="modal-name" placeholder="Ange ditt namn" autocomplete="off">
+      <div class="field-error" id="name-error">Namn krävs</div>
+    </div>
+    <div class="field" id="reason-field">
+      <label>Anledning *</label>
+      <textarea id="modal-reason" placeholder="Beskriv anledningen…" rows="3"></textarea>
+      <div class="field-error" id="reason-error">Anledning krävs</div>
+    </div>
+    <div class="field" id="until-field">
+      <label>Beräknat klart (valfritt)</label>
+      <input type="datetime-local" id="modal-until">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="modal-cancel">Avbryt</button>
+      <button class="btn-confirm-modal block" id="modal-confirm">Bekräfta</button>
+    </div>
+  </div>
+</div>
+
+<!-- History modal -->
+<div class="overlay" id="hist-overlay">
+  <div class="modal">
+    <div class="modal-title" id="hist-title">Historik</div>
+    <div class="hist-list" id="hist-list"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="hist-close">Stäng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// FIREBASE CONFIG — ersätt med din projektkonfiguration
+// Stegen finns i bannern ovan om du inte har ett Firebase-projekt
+// ═══════════════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+// ═══════════════════════════════════════════════════════════════════
+
+const ENVS = ["CT1","CT2","CT3","CT4","CT5","U3","U4","U5","Stable"];
+
+const STATUS_MAP = {
+  clear:   { dot:"green",  label:"Rensad",    sub:"Redo för deploy" },
+  unclear: { dot:"yellow", label:"Oklart",    sub:"" },
+  block:   { dot:"red",    label:"Blockerad", sub:"" },
+};
+
+const state = {};
+let db = null;
+let isConfigured = false;
+
+// ── Helpers ─────────────────────────────────────────────────────────
+function fmt(iso) {
+  try { return new Date(iso).toLocaleString("sv-SE",{dateStyle:"short",timeStyle:"short"}); }
+  catch { return iso; }
+}
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function showNotice(msg) {
+  const el = document.getElementById("notice");
+  el.textContent = msg;
+  el.classList.toggle("show", !!msg);
+}
+
+// ── Check config ─────────────────────────────────────────────────────
+function checkConfig() {
+  const c = FIREBASE_CONFIG;
+  if (!c.apiKey || c.apiKey === "YOUR_API_KEY" || !c.databaseURL || c.databaseURL.includes("YOUR_PROJECT_ID")) {
+    document.getElementById("setup-banner").classList.add("show");
+    document.getElementById("last-updated").textContent = "Inte ansluten — se konfigurationsguiden ovan";
+    return false;
+  }
+  return true;
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────
+let pendingEnv = null, pendingStatus = null;
+const overlay    = document.getElementById("overlay");
+const modalTitle = document.getElementById("modal-title");
+const nameInput  = document.getElementById("modal-name");
+const nameError  = document.getElementById("name-error");
+const reasonEl   = document.getElementById("modal-reason");
+const reasonError= document.getElementById("reason-error");
+const untilEl    = document.getElementById("modal-until");
+const confirmBtn = document.getElementById("modal-confirm");
+
+function openModal(env, status) {
+  closeAllDropdowns();
+  pendingEnv = env; pendingStatus = status;
+  const titles   = { block:"Blockera", unclear:"Markera som oklart", clear:"Markera klar" };
+  const confirms = { block:"Blockera", unclear:"Markera oklart", clear:"Markera klar" };
+  modalTitle.textContent = (titles[status] || status) + ": " + env;
+  nameInput.value = ""; reasonEl.value = ""; untilEl.value = "";
+  nameError.classList.remove("show"); reasonError.classList.remove("show");
+  const needsReason = status !== "clear";
+  document.getElementById("reason-field").style.display = needsReason ? "" : "none";
+  document.getElementById("until-field").style.display  = needsReason ? "" : "none";
+  confirmBtn.className = "btn-confirm-modal " + status;
+  confirmBtn.textContent = confirms[status] || "Bekräfta";
+  overlay.classList.add("open");
+  setTimeout(() => nameInput.focus(), 50);
+}
+function closeModal() { overlay.classList.remove("open"); pendingEnv = pendingStatus = null; }
+document.getElementById("modal-cancel").addEventListener("click", closeModal);
+overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
+
+confirmBtn.addEventListener("click", () => {
+  const name = nameInput.value.trim();
+  if (!name) { nameError.classList.add("show"); nameInput.focus(); return; }
+  nameError.classList.remove("show");
+  const needsReason = pendingStatus !== "clear";
+  const reason = needsReason ? reasonEl.value.trim() : null;
+  if (needsReason && !reason) { reasonError.classList.add("show"); reasonEl.focus(); return; }
+  reasonError.classList.remove("show");
+  const until = untilEl.value ? new Date(untilEl.value).toISOString() : null;
+  setStatus(pendingEnv, pendingStatus, reason, until, name);
+  closeModal();
+});
+
+// ── History modal ────────────────────────────────────────────────────
+const histOverlay = document.getElementById("hist-overlay");
+const histTitle   = document.getElementById("hist-title");
+const histList    = document.getElementById("hist-list");
+document.getElementById("hist-close").addEventListener("click", closeHistModal);
+histOverlay.addEventListener("click", e => { if (e.target === histOverlay) closeHistModal(); });
+function closeHistModal() { histOverlay.classList.remove("open"); }
+
+function openHistory(env) {
+  closeAllDropdowns();
+  if (!db) return;
+  histTitle.textContent = "Historik: " + env;
+  histList.innerHTML = '<div class="hist-loading">Laddar…</div>';
+  histOverlay.classList.add("open");
+  db.ref("history/" + env).orderByChild("at").limitToLast(25).once("value", snap => {
+    const entries = [];
+    snap.forEach(child => entries.push(child.val()));
+    entries.reverse();
+    if (!entries.length) {
+      histList.innerHTML = '<div class="hist-empty">Ingen historik ännu.</div>';
+      return;
+    }
+    histList.innerHTML = "";
+    entries.forEach(e => {
+      if (!e || !e.status) return;
+      const info = STATUS_MAP[e.status] || STATUS_MAP.clear;
+      const el = document.createElement("div");
+      el.className = "hist-entry";
+      el.innerHTML = `
+        <span class="hist-dot ${info.dot}"></span>
+        <div class="hist-body">
+          <div class="hist-row1">
+            <span class="hist-status">${info.label}</span>
+            <span class="hist-time">${e.at ? fmt(e.at) : "–"}</span>
+          </div>
+          ${e.reason ? `<div class="hist-reason">${esc(e.reason)}</div>` : ""}
+          ${e.until  ? `<div class="hist-until">Till: ${fmt(e.until)}</div>` : ""}
+          ${e.name   ? `<div class="hist-until">Av: ${esc(e.name)}</div>` : ""}
+        </div>`;
+      histList.appendChild(el);
+    });
+  });
+}
+
+// ── Dropdowns ─────────────────────────────────────────────────────────
+function closeAllDropdowns() {
+  document.querySelectorAll(".dropdown.open").forEach(d => d.classList.remove("open"));
+}
+document.addEventListener("click", e => {
+  if (!e.target.closest(".dropdown-wrap")) closeAllDropdowns();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { closeModal(); closeHistModal(); closeAllDropdowns(); }
+});
+
+// ── DB writes ────────────────────────────────────────────────────────
+function setStatus(env, status, reason, until, name) {
+  if (!db) return;
+  const at = new Date().toISOString();
+  db.ref("status/" + env).set({ status, reason: reason || null, until: until || null });
+  const entry = { env, status, reason: reason || null, until: until || null, at, name: name || null };
+  db.ref("history/" + env + "/" + Date.now()).set(entry);
+  db.ref("activity/" + Date.now()).set(entry);
+}
+
+// ── Render ─────────────────────────────────────────────────────────────
+function updateStats() {
+  const blockers = ENVS.filter(e => state[e] && (state[e].status === "block" || state[e].status === "unclear")).length;
+  const ready = ENVS.length - blockers;
+  const readyEl = document.getElementById("stat-ready");
+  const blockEl = document.getElementById("stat-blockers");
+  readyEl.textContent = ready + "/" + ENVS.length;
+  blockEl.textContent = blockers;
+  blockEl.className = "stat-value" + (blockers > 0 ? " red" : "");
+  document.getElementById("env-count").textContent = ENVS.length + " miljöer";
+  document.getElementById("last-updated").textContent = "Uppdaterad " + fmt(new Date().toISOString());
+}
+
+function renderEnvGrid() {
+  const grid = document.getElementById("env-grid");
+  grid.innerHTML = "";
+  ENVS.forEach(env => {
+    const s = state[env] || { status: "clear" };
+    const info = STATUS_MAP[s.status] || STATUS_MAP.clear;
+    const isClear = s.status === "clear";
+    const card = document.createElement("div");
+    card.className = "clear-card" + (isClear ? "" : " " + s.status);
+
+    let inner = `
+      <div class="clear-card-top">
+        <span class="dot ${info.dot}"></span>
+        <span class="clear-name">${env}</span>
+        ${!isClear ? `<span class="status-badge ${s.status}">${info.label}</span>` : ""}
+      </div>`;
+
+    if (!isClear && s.reason) {
+      inner += `<div class="card-reason">${esc(s.reason)}</div>`;
+    }
+    if (!isClear && s.until) {
+      inner += `<div class="card-until">Till: ${fmt(s.until)}</div>`;
+    }
+
+    if (isClear) {
+      inner += `<div class="clear-sub">Inga blockers</div>`;
+      inner += `<div class="clear-sub2">Redo för deploy</div>`;
+    }
+
+    inner += `
+      <div class="clear-footer">
+        ${!isClear
+          ? `<button class="btn-clear-env" data-env="${env}">Markera klar</button>`
+          : `<button class="history-link" data-env="${env}">Historik</button>`}
+        <div class="dropdown-wrap">
+          <button class="btn-menu">···</button>
+          <div class="dropdown" id="dd-${env}">
+            <button class="dropdown-item" data-action="block"   data-env="${env}">Blockera</button>
+            <button class="dropdown-item" data-action="unclear" data-env="${env}">Oklart</button>
+            ${!isClear ? `<button class="dropdown-item" data-action="hist" data-env="${env}">Historik</button>` : ""}
+          </div>
+        </div>
+      </div>`;
+
+    card.innerHTML = inner;
+
+    if (!isClear) {
+      card.querySelector(".btn-clear-env")
+          .addEventListener("click", () => openModal(env, "clear"));
+    } else {
+      card.querySelector(".history-link")
+          .addEventListener("click", () => openHistory(env));
+    }
+    card.querySelector(".btn-menu").addEventListener("click", e => {
+      e.stopPropagation();
+      const dd = document.getElementById("dd-" + env);
+      const wasOpen = dd.classList.contains("open");
+      closeAllDropdowns();
+      if (!wasOpen) dd.classList.add("open");
+    });
+    card.querySelectorAll(".dropdown-item").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.action === "hist") openHistory(btn.dataset.env);
+        else openModal(btn.dataset.env, btn.dataset.action);
+      });
+    });
+
+    grid.appendChild(card);
+  });
+  updateStats();
+}
+
+// ── Activity feed ────────────────────────────────────────────────────
+function setupActivityFeed() {
+  if (!db) return;
+  db.ref("activity").orderByChild("at").limitToLast(8).on("value", snap => {
+    const entries = [];
+    snap.forEach(child => entries.push(child.val()));
+    entries.reverse();
+    const section = document.getElementById("activity-section");
+    const list    = document.getElementById("activity-list");
+    if (!entries.length) { section.style.display = "none"; return; }
+    section.style.display = "";
+    list.innerHTML = "";
+    entries.forEach(e => {
+      if (!e || !e.status || !e.env) return;
+      const info = STATUS_MAP[e.status] || STATUS_MAP.clear;
+      const item = document.createElement("div");
+      item.className = "activity-item";
+      const title = e.status === "clear"
+        ? `${e.env} markerades klar`
+        : `${e.env} ${e.status === "block" ? "blockerades" : "markerades oklart"}`;
+      item.innerHTML = `
+        <span class="activity-dot ${info.dot}"></span>
+        <div class="activity-body">
+          <div class="activity-title">${title}${e.reason ? ": " + esc(e.reason) : ""}</div>
+          <div class="activity-meta">${e.at ? fmt(e.at) : ""}${e.name ? " · " + esc(e.name) : ""}</div>
+        </div>`;
+      list.appendChild(item);
+    });
+  });
+}
+
+// ── Boot ────────────────────────────────────────────────────────────
+(function() {
+  isConfigured = checkConfig();
+
+  // Init state
+  ENVS.forEach(env => { state[env] = { status: "clear", reason: null, until: null }; });
+  renderEnvGrid();
+
+  if (!isConfigured) return;
+
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+  } catch (err) {
+    showNotice("Firebase-fel: " + err.message);
+    return;
+  }
+
+  // Listen to all env statuses
+  ENVS.forEach(env => {
+    db.ref("status/" + env).on("value", snap => {
+      const data = snap.val() || {};
+      state[env] = {
+        status: data.status || "clear",
+        reason: data.reason || null,
+        until:  data.until  || null,
+      };
+      renderEnvGrid();
+    }, err => {
+      showNotice("Kunde inte läsa status: " + err.message);
+    });
+  });
+
+  setupActivityFeed();
+})();
+</script>
+</body>
+</html>
