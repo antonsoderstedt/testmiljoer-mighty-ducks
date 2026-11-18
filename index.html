@@ -287,7 +287,10 @@ body {
   outline: none;
 }
 .log-filters select:focus, .log-filters input:focus { border-color: var(--accent); }
-.log-filters input { flex: 1; min-width: 180px; }
+.log-filters input[type="search"] { flex: 1; min-width: 180px; }
+.f-range { display: none; align-items: center; gap: 8px; }
+.f-range.show { display: flex; }
+.f-range label { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .f-chips {
   display: flex;
   background: var(--surface);
@@ -536,6 +539,18 @@ body {
       <button class="f-chip" data-status="unclear">Oklart</button>
       <button class="f-chip" data-status="clear">Rensad</button>
     </div>
+    <select id="f-period" aria-label="Filtrera på period">
+      <option value="">Alla tider</option>
+      <option value="hour">Senaste timmen</option>
+      <option value="today">Idag</option>
+      <option value="7d">Senaste 7 dagarna</option>
+      <option value="30d">Senaste 30 dagarna</option>
+      <option value="custom">Anpassat…</option>
+    </select>
+    <span class="f-range" id="f-range">
+      <label>Från <input type="datetime-local" id="f-from"></label>
+      <label>Till <input type="datetime-local" id="f-to"></label>
+    </span>
     <input type="search" id="f-search" placeholder="Sök namn eller anledning…" aria-label="Sök">
     <button class="f-reset" id="f-reset">Rensa filter</button>
   </div>
@@ -839,10 +854,35 @@ function renderEnvGrid() {
 
 // ── Activity feed ────────────────────────────────────────────────────
 let logEntries = [];
-const logFilter = { env: "", status: "", q: "" };
+const logFilter = { env: "", status: "", q: "", period: "", from: "", to: "" };
 
 const fEnv    = document.getElementById("f-env");
 const fSearch = document.getElementById("f-search");
+const fPeriod = document.getElementById("f-period");
+const fFrom   = document.getElementById("f-from");
+const fTo     = document.getElementById("f-to");
+fPeriod.addEventListener("change", () => {
+  logFilter.period = fPeriod.value;
+  document.getElementById("f-range").classList.toggle("show", fPeriod.value === "custom");
+  renderLog();
+});
+fFrom.addEventListener("change", () => { logFilter.from = fFrom.value; renderLog(); });
+fTo.addEventListener("change",   () => { logFilter.to   = fTo.value;   renderLog(); });
+
+function periodBounds() {
+  const now = new Date();
+  switch (logFilter.period) {
+    case "hour":  return [new Date(now - 3600e3), null];
+    case "today": { const d = new Date(now); d.setHours(0,0,0,0); return [d, null]; }
+    case "7d":    return [new Date(now - 7 * 864e5), null];
+    case "30d":   return [new Date(now - 30 * 864e5), null];
+    case "custom": return [
+      logFilter.from ? new Date(logFilter.from) : null,
+      logFilter.to   ? new Date(logFilter.to)   : null,
+    ];
+    default: return [null, null];
+  }
+}
 ENVS.forEach(env => fEnv.insertAdjacentHTML("beforeend", `<option value="${env}">${env}</option>`));
 fEnv.addEventListener("change", () => { logFilter.env = fEnv.value; renderLog(); });
 fSearch.addEventListener("input", () => { logFilter.q = fSearch.value.trim().toLowerCase(); renderLog(); });
@@ -852,15 +892,16 @@ document.querySelectorAll(".f-chip").forEach(chip => chip.addEventListener("clic
   renderLog();
 }));
 document.getElementById("f-reset").addEventListener("click", () => {
-  logFilter.env = logFilter.status = logFilter.q = "";
-  fEnv.value = ""; fSearch.value = "";
+  logFilter.env = logFilter.status = logFilter.q = logFilter.period = logFilter.from = logFilter.to = "";
+  fEnv.value = ""; fSearch.value = ""; fPeriod.value = ""; fFrom.value = ""; fTo.value = "";
+  document.getElementById("f-range").classList.remove("show");
   document.querySelectorAll(".f-chip").forEach(c => c.classList.toggle("active", c.dataset.status === ""));
   renderLog();
 });
 
 function setupActivityFeed() {
   if (!db) return;
-  db.ref("activity").orderByChild("at").limitToLast(300).on("value", snap => {
+  db.ref("activity").orderByChild("at").limitToLast(1000).on("value", snap => {
     const entries = [];
     snap.forEach(child => { entries.push(child.val()); });
     logEntries = entries
@@ -876,12 +917,16 @@ function renderLog() {
   if (!logEntries.length) { section.style.display = "none"; return; }
   section.style.display = "";
   const { env, status, q } = logFilter;
-  const valid = logEntries.filter(e =>
-    (!env || e.env === env) &&
-    (!status || e.status === status) &&
-    (!q || [e.name, e.reason, e.env].some(v => v && v.toLowerCase().includes(q)))
-  );
-  const filtered = env || status || q;
+  const [from, to] = periodBounds();
+  const valid = logEntries.filter(e => {
+    const t = new Date(e.at);
+    return (!env || e.env === env) &&
+      (!status || e.status === status) &&
+      (!from || t >= from) &&
+      (!to || t <= to) &&
+      (!q || [e.name, e.reason, e.env].some(v => v && v.toLowerCase().includes(q)));
+  });
+  const filtered = env || status || q || from || to;
   document.getElementById("activity-count").textContent =
     filtered ? `${valid.length} av ${logEntries.length}` : `${logEntries.length} ändringar`;
   document.getElementById("f-reset").style.visibility = filtered ? "visible" : "hidden";
